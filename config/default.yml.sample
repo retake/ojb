@@ -1,0 +1,17 @@
+
+soc_msgs:
+  conn: 'connect'
+  playstop: 'playingstop'
+  playstart: 'playstart'
+  playend: 'fileplayend'
+  updateplaylist: 'playlist'
+  removefile: 'fileremove'
+  uploadfile: 'upload'
+  sendcurrenttime: 'currentTime'
+  changename: 'changename'
+  updateuserlist: 'updateuserlist'
+  getcurrenttime: 'getcurrenttime'
+  retcurrenttime: 'retcurrenttime'
+
+address: 'localhost:3000'
+
