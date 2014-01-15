@@ -33,7 +33,7 @@
 
 
   // websocket接続開始
-  var address = '<%=conf.address%>';
+  var address = '<%=conf.host%>:<%=conf.port%>';
   var socket = io.connect(address);
 
    // 接続開始完了時の処理
