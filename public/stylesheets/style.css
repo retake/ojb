@@ -1,8 +1,27 @@
 body {
   padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  font: 16px "Lucida Grande", Helvetica, Arial, sans-serif;
 }
 
 a {
   color: #00B7FF;
 }
+
+#dropzone {background-color:gray}
+table {background-color:peachpuff;border:0}
+.mydata {background-color:palegreen;color:red}
+.otherdata {background-color:paleturquoise}
+#mainarea {overflow:hidden;width:90%;height:500px;background-color:whitesmoke;margin:0 auto 0 auto}
+#media {float:left;margin:20px;videoWidth:600px}
+#playlist {float:left;margin:20px}
+input[type="button"] {
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+.nofiletr {background-color:white;text-align:center}
+.no {width:20px;text-align:center}
+.id {width:180px}
+.file {width:200px}
+.remove {width:20px;text-align:center}
+
