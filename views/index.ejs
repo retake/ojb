@@ -208,9 +208,8 @@
 
     for (var i=0; i<playlist.length; i++){
       var remove_elm = document.getElementById('playno'+i);
-      var no = i;
       if (!remove_elm.disabled){
-        remove_elm.addEventListener("click",function(e){removefile(no);},false);
+        remove_elm.addEventListener("click",function(e){removefile(e.target.id);},false);
       }
     }
 
@@ -267,7 +266,8 @@
   }
 
   // ファイル削除通知送信
-  function removefile(fileno) {
+  function removefile(fileid) {
+    fileno = fileid.match(/\d+$/);
     socket.emit('<%=conf.soc_msgs.removefile%>',{filename:playlist[fileno].filename});
   }
 
