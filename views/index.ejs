@@ -1,7 +1,42 @@
 <!DOCTYPE html>
 <script src="/socket.io/socket.io.js"></script>
+</script>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title><%= title %></title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+    <div id="dropzone">
+      <font size=32 color="white">追加したいファイルをドロップ</font>
+      <div id='upload_status_view'></div>
+      <div id='upload_fails'></div>
+    </div>
+    <br>
+    <div id="name"></div>
+    <br>
+    <div id="playinginfo"></div>
+    <br>
+    <div id='mainarea'>
+      <div id="playlist"></div>
+      <video id='media'></video>
+    </div>
+    <br>
+    <div id="userlist"></div>
+    <br>
+    <input type="text" id="newname" />
+    <input type="button" id="changename" value="名前を変更" />
+    <input type="button"  id="disconnect_btn" value="切断" />
+    <input type="button"  id="reconnect_btn" value="再接続" />
+  </body>
+</html>
+
+
+
 <script type="text/javascript">
 
+(function(){
 
   // 変数宣言
   var uploading_flg = false;
@@ -14,7 +49,6 @@
   var audio_mime_types = getAudioMimeTypes();
   var video_mime_types = getVideoMimeTypes();
   var mime_types = audio_mime_types.concat(video_mime_types);
-  console.log(mime_types);
 
   var media = undefined;
 
@@ -161,7 +195,7 @@
         playlist_str = playlist_str.concat('<td class=\'no\'>'+(i+1)+'</td>');
         playlist_str = playlist_str.concat('<td class=\'id\'>'+getDispName(playlist[i].sessid)+'</td>');
         playlist_str = playlist_str.concat('<td class=\'file\'>'+filename+'</td>');
-        playlist_str = playlist_str.concat('<td class=\'remove\'><input type=button value=\'削除\' onclick="removefile('+i+')" '+btn_sts+'/></td>');
+        playlist_str = playlist_str.concat('<td class=\'remove\'><input id="playno'+i+'" type=button value=\'削除\' '+btn_sts+'/></td>');
         playlist_str = playlist_str.concat('</tr>');
       } 
     } else {
@@ -171,6 +205,15 @@
     }
     playlist_str = playlist_str.concat('</table>');
     playlist_elm.innerHTML = playlist_str;
+
+    for (var i=0; i<playlist.length; i++){
+      var remove_elm = document.getElementById('playno'+i);
+      var no = i;
+      if (!remove_elm.disabled){
+        remove_elm.addEventListener("click",function(e){removefile(no);},false);
+      }
+    }
+
   }
 
   // ユーザーリストテーブル最新化
@@ -341,43 +384,25 @@
   }
 
   // 名前変更のenterkeyでの処理
-  function changeNameFromEnter(keycode) {
-    if (keycode==13) {
+  function changeNameFromEnter(e) {
+    if (e.keycode==13) {
       changeName();
     }
   }
 
+  // documentのイベント作成
+  var dropzone = document.getElementById('dropzone');
+  dropzone.addEventListener("dragover",handleDragOver,false);
+  dropzone.addEventListener("drop", handleFileSelect,false);
+  document.getElementById("newname").addEventListener("keypress",changeNameFromEnter,false);
+  document.getElementById("changename").addEventListener("click",changeName,false);
+  document.getElementById("disconnect_btn").addEventListener("click",disConnect,false);
+  document.getElementById("reconnect_btn").addEventListener("click",reConnect,false);
+
+
+})();
+
+
 </script>
 
-
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title><%= title %></title>
-    <link rel='stylesheet' href='/stylesheets/style.css' />
-  </head>
-  <body>
-    <div id="dropzone" ondrop="handleFileSelect(event)" ondragover="handleDragOver(event)">
-      <font size=32 color="white">追加したいファイルをドロップ</font>
-      <div id='upload_status_view'></div>
-      <div id='upload_fails'></div>
-    </div>
-    <br>
-    <div id="name"></div>
-    <br>
-    <div id="playinginfo"></div>
-    <br>
-    <div id='mainarea'>
-      <div id="playlist"></div>
-      <video id='media'></video>
-    </div>
-    <br>
-    <div id="userlist"></div>
-    <br>
-    <input type="text" id="newname" onkeypress="changeNameFromEnter(event.keyCode);" />
-    <input type="button" value="名前を変更" onclick="changeName();" />
-    <input type="button"  id="disconnect_btn" value="切断" onclick="disConnect();" />
-    <input type="button"  id="reconnect_btn" value="再接続" onclick="reConnect();" />
-  </body>
-</html>
 
