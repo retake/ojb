@@ -12,25 +12,7 @@
   var playing_file_info = "";
 
 
-  // audio初期化
-  var audio = new Audio();
-  audio.preload = 'metadata';
-  audio.addEventListener("ended", function(e){
-    if (playlist[0].sessid == sessid && playing_file_info=='player'){
-      socket.emit('<%=conf.soc_msgs.playend%>', playlist[0]);
-    }
-  },false);;
-  audio.addEventListener("loadedmetadata", function(e){
-    if (playlist[0].sessid == sessid){
-      playing_file_info = 'player';
-      audio.play();
-    } else {
-      playing_file_info = 'listener';
-      socket.emit('<%=conf.soc_msgs.getcurrenttime%>',{});
-    }
-    console.log(playing_file_info);
-  }, false);
-
+  var media = undefined;
 
   // websocket接続開始
   var address = '<%=conf.host%>:<%=conf.port%>';
@@ -41,8 +23,43 @@
     console.log('<%=conf.soc_msgs.conn%>');
     sessid = socket.socket.transport.sessid;
     document.getElementById("name").value = sessid;
+ 
+   // mediaの初期化
+    media = document.getElementById("media");
+    media.preload = 'metadata';
+    media.addEventListener("ended", function(e){
+      if (playlist[0].sessid == sessid && playing_file_info=='player'){
+        socket.emit('<%=conf.soc_msgs.playend%>', playlist[0]);
+      }
+    },false);
+    media.addEventListener("loadedmetadata", function(e){
+      if (playlist[0].sessid == sessid){
+        playing_file_info = 'player';
+        mediastart();
+      } else {
+        playing_file_info = 'listener';
+        socket.emit('<%=conf.soc_msgs.getcurrenttime%>',{});
+      }
+      console.log(playing_file_info);
+    }, false);
   });
 
+  // メディア再生処理
+  function mediastart(){
+    var filetype = playlist[0].filetype;
+    if ( filetype == 'audio/mp3' ) {
+      media.style.display = "none";
+    } else if ( filetype == 'video/mp4' ){
+      media.style.display = "";
+    }
+    media.play();
+  }
+
+  // メディア停止処理
+  function mediastop(){
+    media.style.display = "none";
+    media.pause();
+  }
 
   // 画面更新時の処理
   window.onbeforeunload = function(){
@@ -53,8 +70,8 @@
   function disConnect() {
     var yourname = getDispName(sessid);
     document.getElementById('name').innerHTML = '<font color=\'red\'><b>'+yourname+'</b></font> は死んでしまった！';
-    if(audio!=undefined && audio.ended==false){
-      audio.pause();
+    if(media!=undefined && media.ended==false){
+      mediastop();
     }
     socket.disconnect({sessid:sessid});
     document.getElementById('disconnect_btn').style.display = "none";
@@ -72,21 +89,21 @@
  // 再生停止通知受信時の処理
   socket.on('<%=conf.soc_msgs.playstop%>', function(data) {
     console.log('<%=conf.soc_msgs.playstop%>');
-    audio.pause();
+    mediastop();
   });
 
   // 再生開始時の処理
   socket.on('<%=conf.soc_msgs.playstart%>', function(startTime) {
     console.log('<%=conf.soc_msgs.playstart%>');
-    audio.src = './audiodata/'+playlist[0].filename;
-    audio.load();
+    media.src = './mediadata/'+playlist[0].filename;
+    mediastart();
   });
 
   // 最新再生時刻受信時
   socket.on('<%=conf.soc_msgs.retcurrenttime%>', function(data) {
     console.log('<%=conf.soc_msgs.retcurrenttime%>');
-    audio.currentTime = data;
-    audio.play();
+    media.currentTime = data;
+    mediastart();
   });
 
   // プレイリスト更新通知受信時の処理
@@ -203,7 +220,6 @@
   function SendFile(file) {
     socket.emit('<%=conf.soc_msgs.uploadfile%>',file,function(data){
       if (data=="success"){
-        uploading_flg = false;
         changeUploadStatusView(file.name,"upload_complete");
       }
     });
@@ -211,11 +227,10 @@
 
   // 一秒置きに 再生中ファイルの時間を送信
   setInterval( function(){
-    if (playlist.length != 0 && playlist[0].sessid == sessid && audio != undefined){
-      socket.emit('<%=conf.soc_msgs.sendcurrenttime%>', {value:audio.currentTime});
+    if (playlist.length != 0 && playlist[0].sessid == sessid && media != undefined){
+      socket.emit('<%=conf.soc_msgs.sendcurrenttime%>', {value:media.currentTime});
     }
   },1000);
-
 
   // ファイルDrop時の制御
   function handleFileSelect(e) {
@@ -240,14 +255,33 @@
       var reader = new FileReader();
       var file = upload_que[0].file;
       var filename = upload_que[0].filename;
-      changeUploadStatusView(filename,"uploading");
-      reader.onload = function(readed) {
-        SendFile({file:readed.target.result, name:filename});
+      if ( checkFileType(file.type) ){
+        changeUploadStatusView(filename,"uploading");
+        reader.onload = function(readed) {
+          SendFile({file:readed.target.result, name:filename, filetype:file.type});
+          upload_que.shift();
+        uploading_flg = false;
+        }
+      } else {
+        changeUploadStatusView(filename,"denied");
         upload_que.shift();
+        uploading_flg = false;
       }
       reader.readAsBinaryString(file);
     }
   },3000);
+
+  function checkFileType(filetype){
+    var permittedFileTypes = ['audio/mp3','video/mp4'];
+    for (var i=0; i<permittedFileTypes.length; i++){
+      if (permittedFileTypes[i] == filetype){
+        return true;
+      }
+    }
+    return false;
+  }
+
+
 
   // dropzoneの上をdragした場合の制御
   function handleDragOver(e) {
@@ -268,12 +302,15 @@
     view_str = "";
     if (st_flg=="uploading"){
       view_str = '<font size="14"><b> 『' + filename + '』 を設定中！</b></font>';
-    } else {
+    } else if (st_flg=='upload_complete'){
       view_str = '<font size="14"><b> 『' + filename + '』 設定完了！</b></font>';
     }
     upload_status_view.innerHTML = view_str;
+
+    if (st_flg=='denied'){
+      document.getElementById('upload_fails').innerHTML = '『' + filename +'』は対応していない形式です';
+    }
   }
-  
 
   // 名前変更のenterkeyでの処理
   function changeNameFromEnter(keycode) {
@@ -295,7 +332,10 @@
     <div style="background-color:gray" id="drop_zone" ondrop="handleFileSelect(event)" ondragover="handleDragOver(event)">
       <font size=32 color="white">追加したいファイルをドロップ</font>
       <div id='upload_status_view'></div>
+      <div id='upload_fails'></div>
     </div>
+    <br>
+    <video id='media' style="display:none"></video>
     <br>
     <div id="name"></div>
     <br>

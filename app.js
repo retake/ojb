@@ -42,8 +42,8 @@ server.listen(app.get('port'), function(){
 var socketIO = require('socket.io');
 var io = socketIO.listen(server);
 
-var audiofiles = [];
-var audioStatus = 'stop';
+var mediafiles = [];
+var mediaStatus = 'stop';
 var currentTime = 0;
 
 var userlist = [];
@@ -62,7 +62,7 @@ io.sockets.on('connection', function(socket) {
   updatePlayList();
 
   // 再生中のファイルがあれば、接続してきたクライアントに開始時刻を送る
-  if (audioStatus=='playing'){
+  if (mediaStatus=='playing'){
     updatePlayList();
     io.sockets.socket(sessid).emit(soc_msgs.playstart,currentTime);
   }
@@ -81,7 +81,7 @@ io.sockets.on('connection', function(socket) {
 
   // 最新のプレイリストを送信
   function updatePlayList(){
-    io.sockets.emit(soc_msgs.updateplaylist,audiofiles);
+    io.sockets.emit(soc_msgs.updateplaylist,mediafiles);
   }
 
   // 最新のユーザーリストを送信
@@ -93,16 +93,16 @@ io.sockets.on('connection', function(socket) {
   socket.on('disconnect', function(data) {
     console.log("disconnect");
     var playing_user_flg = false;
-    if (audiofiles.length != 0 && audiofiles[0].sessid==socket.id){
+    if (mediafiles.length != 0 && mediafiles[0].sessid==socket.id){
       playing_user_flg = true;
-      audioStatus = 'lock';
+      mediaStatus = 'lock';
       io.sockets.emit(soc_msgs.playstop,{});
       currentTime = 0;
     }
-    for (var i=audiofiles.length-1; i>=0; i--) {
-      if(audiofiles[i].sessid==socket.id) {
-        removeFile(audiofiles[i].filename);
-        audiofiles.splice(i,1);
+    for (var i=mediafiles.length-1; i>=0; i--) {
+      if(mediafiles[i].sessid==socket.id) {
+        removeFile(mediafiles[i].filename);
+        mediafiles.splice(i,1);
         break;
       };
     }
@@ -126,9 +126,9 @@ io.sockets.on('connection', function(socket) {
   // 再生終了通知を受信
   socket.on(soc_msgs.playend, function(data){
     console.log(soc_msgs.playend);
-    audioStatus='lock';
-    removeFile(audiofiles[0].filename);
-    audiofiles.splice(0,1);
+    mediaStatus='lock';
+    removeFile(mediafiles[0].filename);
+    mediafiles.splice(0,1);
     updatePlayList();
     currentTime = 0;
 
@@ -140,20 +140,20 @@ io.sockets.on('connection', function(socket) {
   socket.on(soc_msgs.removefile, function(data){
     console.log(soc_msgs.removefile);
     var targetno = null;
-    for (var i=0; i<audiofiles.length; i++){
-      if (audiofiles[i].sessid == socket.id && audiofiles[i].filename == data.filename) {
+    for (var i=0; i<mediafiles.length; i++){
+      if (mediafiles[i].sessid == socket.id && mediafiles[i].filename == data.filename) {
         targetno = i
         break;
       }
     }
     if (targetno == 0) {
-      audioStatus = 'lock';
+      mediaStatus = 'lock';
       io.sockets.emit(soc_msgs.playstop,{});
       currentTime = 0;
     }
 
-    removeFile(audiofiles[targetno].filename);
-    audiofiles.splice(targetno,1);
+    removeFile(mediafiles[targetno].filename);
+    mediafiles.splice(targetno,1);
     updatePlayList();
 
     // 5秒待ってからstatusをstopにする
@@ -171,11 +171,11 @@ io.sockets.on('connection', function(socket) {
 
   // ファイルが送られてきた時の処理
   socket.on(soc_msgs.uploadfile, function(data,fn){
-    audiofiles.push({sessid:socket.id,filename:data.name,status:"writing"});
+    mediafiles.push({sessid:socket.id,filename:data.name,status:"writing",filetype:data.filetype});
     updatePlayList();
     var fs = require('fs');
     var writeFile = data.file;
-    var writePath = './public/audiodata/'+data.name;
+    var writePath = './public/mediadata/'+data.name;
     var writeStream = fs.createWriteStream(writePath);
     writeStream.on('drain',function() {})
       .on('error',function(exception) {
@@ -187,9 +187,9 @@ io.sockets.on('connection', function(socket) {
       .on('pipe',function(src){});
     writeStream.write(writeFile,'binary');
     writeStream.end();
-    for (var i in audiofiles){
-      if (audiofiles[i].sessid == socket.id && audiofiles[i].filename==data.name){
-        audiofiles[i].status = "writed";
+    for (var i in mediafiles){
+      if (mediafiles[i].sessid == socket.id && mediafiles[i].filename==data.name){
+        mediafiles[i].status = "writed";
       }
     } 
     fn('success');
@@ -197,13 +197,13 @@ io.sockets.on('connection', function(socket) {
 
   // 再生中ファイルが無い場合、最初のファイルの再生を始める
   setInterval(function(){
-    if (audioStatus=='stop' && audiofiles.length!=0){
-      if (audiofiles[0].status != 'writing'){
-        audioStatus = 'lock';
+    if (mediaStatus=='stop' && mediafiles.length!=0){
+      if (mediafiles[0].status != 'writing'){
+        mediaStatus = 'lock';
         currentTime = 0;
         updatePlayList();
         io.sockets.emit(soc_msgs.playstart,0);
-        audioStatus='playing';
+        mediaStatus='playing';
       }
     }
   },5000);
@@ -218,7 +218,7 @@ io.sockets.on('connection', function(socket) {
 // 5秒待ってからstatusをstopにする
 function changeStatusToStop() {
   sleep(5000,function(){
-    audioStatus='stop';
+    mediaStatus='stop';
   });
 }
 
@@ -230,6 +230,6 @@ function sleep(time,callback){
 // ファイル削除
 function removeFile(filename){
   var fs = require('fs');
-  fs.unlink('./public/audiodata/'+filename);
+  fs.unlink('./public/mediadata/'+filename);
   console.log(filename+'を削除しました。');
 }
