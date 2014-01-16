@@ -16,3 +16,8 @@ soc_msgs:
 host: 'localhost'
 port: '3000'
 
+mime_types:
+  audio: ['audio/aac','audio/mp3','audio/mpeg','audio/mp4','audio/ogg','audio/wav','audio/wave']
+  video: ['video/mpeg','video/mp4','video/ogg','video/x-msvideo']
+
+
