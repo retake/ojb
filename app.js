@@ -43,6 +43,7 @@ var socketIO = require('socket.io');
 var io = socketIO.listen(server);
 
 var mediafiles = [];
+var playlist = [];
 var mediaStatus = 'stop';
 var currentTime = 0;
 
@@ -81,7 +82,14 @@ io.sockets.on('connection', function(socket) {
 
   // 最新のプレイリストを送信
   function updatePlayList(){
-    io.sockets.emit(soc_msgs.updateplaylist,mediafiles);
+    playlist = [];
+    for (var i in mediafiles){
+      var file = mediafiles[i];
+      if (file.status!="writing"){
+        playlist.push(file);
+      }
+    }
+    io.sockets.emit(soc_msgs.updateplaylist,playlist);
   }
 
   // 最新のユーザーリストを送信
@@ -93,7 +101,7 @@ io.sockets.on('connection', function(socket) {
   socket.on('disconnect', function(data) {
     console.log("disconnect");
     var playing_user_flg = false;
-    if (mediafiles.length != 0 && mediafiles[0].sessid==socket.id){
+    if (mediafiles.length != 0 && playlist[0].sessid==socket.id){
       playing_user_flg = true;
       mediaStatus = 'lock';
       io.sockets.emit(soc_msgs.playstop,{});
@@ -103,7 +111,7 @@ io.sockets.on('connection', function(socket) {
       if(mediafiles[i].sessid==socket.id) {
         removeFile(mediafiles[i].filename);
         mediafiles.splice(i,1);
-        break;
+        continue;
       };
     }
     for (var i=0; i<userlist.length; i++) {
@@ -160,7 +168,7 @@ io.sockets.on('connection', function(socket) {
     if (targetno == 0){
       changeStatusToStop();
     }
-  });
+  })
   
   // currenttimeリクエスト受信時
   socket.on(soc_msgs.getcurrenttime, function(data){
@@ -168,37 +176,58 @@ io.sockets.on('connection', function(socket) {
     socket.emit(soc_msgs.retcurrenttime,currentTime);
   });
 
+  // upload用名前空間
+  var upload_ns = new (function(){
+    this.writestart = false;
+    this.fs = null;
 
+    this.reset = function() {
+      this.writestart = false;
+      this.fs = null;
+      return this;
+    }
+    return this;
+  });
   // ファイルが送られてきた時の処理
   socket.on(soc_msgs.uploadfile, function(data,fn){
-    mediafiles.push({sessid:socket.id,filename:data.name,status:"writing",filetype:data.filetype});
-    updatePlayList();
-    var fs = require('fs');
-    var writeFile = data.file;
-    var writePath = './public/mediadata/'+data.name;
-    var writeStream = fs.createWriteStream(writePath);
-    writeStream.on('drain',function() {})
-      .on('error',function(exception) {
-        console.log('exception:'+exception);
-      })
-      .on('close',function(){
-        console.log('書き込み完了');
-      })
-      .on('pipe',function(src){});
-    writeStream.write(writeFile,'binary');
-    writeStream.end();
-    for (var i in mediafiles){
-      if (mediafiles[i].sessid == socket.id && mediafiles[i].filename==data.name){
-        mediafiles[i].status = "writed";
-      }
-    } 
-    fn('success');
+    if (!upload_ns.writestart) {
+      upload_ns.writestart = true;
+      mediafiles.push({sessid:socket.id,filename:data.filename,status:"writing",filetype:data.filetype});
+      upload_ns.fs = require('fs');
+      var writePath = './public/mediadata/'+data.filename;
+      var writeStream = upload_ns.fs.createWriteStream(writePath);
+      writeStream.on('drain',function() {})
+        .on('error',function(exception) {
+          console.log('exception:'+exception);
+        })
+        .on('close',function(){
+          //console.log('書き込み完了');
+        })
+        .on('pipe',function(src){});
+      writeStream.write(data.data,'binary');
+      writeStream.end();
+    } else {
+      upload_ns.fs.appendFile('./public/mediadata/'+data.filename,data.data,'binary',function(){
+      });
+    }
+    if (data.end_flg){ 
+     for (var i in mediafiles){
+        if (mediafiles[i].sessid == socket.id && mediafiles[i].filename==data.filename){
+          mediafiles[i].status = "writed";
+        }
+      } 
+      updatePlayList();
+      upload_ns.reset();
+      fn('success');
+    } else {
+      fn('uploading');
+    }          
   });
 
   // 再生中ファイルが無い場合、最初のファイルの再生を始める
   setInterval(function(){
     if (mediaStatus=='stop' && mediafiles.length!=0){
-      if (mediafiles[0].status != 'writing'){
+      if (mediafiles[0].status != "writing"){
         mediaStatus = 'lock';
         currentTime = 0;
         updatePlayList();

@@ -5,10 +5,11 @@
     <meta charset="UTF-8">
     <title><%= title %></title>
     <link rel='stylesheet' href='/stylesheets/style.css' />
+    <script type="text/javascript" src='./javascripts/tools.js' ></script>
   </head>
   <body>
     <div id="dropzone">
-      <font size=32 color="white">追加したいファイルをドロップ</font>
+      <div id='dropzone_caption'><font size=32 color="white">追加したいファイルをドロップ</font></div>
       <div id='upload_status_view'></div>
       <div id='upload_fails'></div>
     </div>
@@ -41,6 +42,17 @@
   // 変数宣言
   var uploading_flg = false;
   var upload_que = [];
+  var slice_uploading_flg = false;
+  var slice_que = [];
+  var slice_size = 1024000;
+  //var slice_size = 409600;
+  var slices = [];
+
+  var queTimer = null;
+  var sliceUploadTimer = null;
+
+  var sendCurrentTimeTimer = null;
+
   var sessid = null; 
   var playlist = [];
   var userlist = [];
@@ -67,14 +79,16 @@
     media.style.display = "none";
     media.preload = 'metadata';
     media.addEventListener("ended", function(e){
-      mediastop();
+      media.style.display = "none";
       if (playlist[0].sessid == sessid && playing_file_info=='player'){
+        sendCurrentTimeTimer.stop();
         socket.emit('<%=conf.soc_msgs.playend%>', playlist[0]);
       }
     },false);
     media.addEventListener("loadedmetadata", function(e){
       if (playlist[0].sessid == sessid){
         playing_file_info = 'player';
+        sendCurrentTimeTimer.start();
         mediastart();
       } else {
         playing_file_info = 'listener';
@@ -275,17 +289,22 @@
   function SendFile(file) {
     socket.emit('<%=conf.soc_msgs.uploadfile%>',file,function(data){
       if (data=="success"){
-        changeUploadStatusView(file.name,"upload_complete");
+        changeUploadStatusView(file.filename,"upload_complete",0);
+        sliceUploadTimer.stop();
+        queTimer.start();
+      } else {
+        var sendStatus = 100 - (~~((slices.length / file.slice_cnt)*100));
+        changeUploadStatusView(file.filename,"uploading",sendStatus);
       }
     });
   }
 
   // 一秒置きに 再生中ファイルの時間を送信
-  setInterval( function(){
+  sendCurrentTimeTimer = new timer(1000,function(){
     if (playlist.length != 0 && playlist[0].sessid == sessid && media != undefined){
       socket.emit('<%=conf.soc_msgs.sendcurrenttime%>', {value:media.currentTime});
     }
-  },1000);
+  });
 
   // ファイルDrop時の制御
   function handleFileSelect(e) {
@@ -301,30 +320,78 @@
     for(var i=0; i<files.length; i++){
       upload_que.push({file:files[i],filename:files[i].name});
     }
+    queTimer.start();
   }
 
-  // 3秒に1度、送信中のファイルが無ければupload用queの中身を送る
-  setInterval(function(){
-    if( upload_que.length !=0 && uploading_flg == false){
-      uploading_flg = true;
+  // 送信用sliceque確認タイマー作成
+  sliceUploadTimer = timer(400,function(){
+    if (slices.length !=0 && uploading_flg){
       var reader = new FileReader();
+      var seqno = slices[0].seqno;
+      var filename = slices[0].filename;
+      var end_flg = slices[0].end_flg;
+      var file_type = slices[0].file_type;
+      var slice_cnt = slices[0].slice_cnt;
+      reader.onload = function(readed) {
+        var data = readed.target.result;
+        SendFile({
+          data:data,
+          seqno:seqno,
+          filename:filename,
+          end_flg:end_flg,
+          filetype:file_type,
+          slice_cnt:slice_cnt
+        });
+        slices.shift();
+        if (slices.length == 0 ){
+          upload_que.shift();
+          uploading_flg = false;
+        }
+      }
+      reader.readAsBinaryString(slices[0].data);
+    }
+  });
+ 
+
+  // 送信中ファイルque確認タイマー作成
+  queTimer = new timer(3000,function(){
+    if( upload_que.length != 0 && !uploading_flg && !slice_uploading_flg){
+      uploading_flg = true;
+ 
       var file = upload_que[0].file;
       var filename = upload_que[0].filename;
+
+      // 正しいファイルタイプである場合は処理を行う
       if ( checkFileType(file.type) ){
-        changeUploadStatusView(filename,"uploading");
-        reader.onload = function(readed) {
-          SendFile({file:readed.target.result, name:filename, filetype:file.type});
-          upload_que.shift();
-        uploading_flg = false;
+        changeUploadStatusView(filename,"uploading",0);
+        var filesize = file.size;
+        var slice_cnt = ~~(filesize/slice_size)+1;
+        for ( var i=0; i<slice_cnt; i++) {
+          var end_flg = false;
+          if (i==slice_cnt-1){
+            end_flg = true;
+          }
+          slices.push({
+            seqno:i,
+             data:file.slice(i*slice_size,(i+1)*slice_size),
+             filename:filename,
+             end_flg:end_flg,
+             file_type:file.type,
+             slice_cnt:slice_cnt
+          });
         }
+        queTimer.stop();
+        sliceUploadTimer.start();
       } else {
-        changeUploadStatusView(filename,"denied");
+        changeUploadStatusView(filename,"denied",0);
         upload_que.shift();
         uploading_flg = false;
       }
-      reader.readAsBinaryString(file);
+    } else if (upload_que.length == 0) {
+      queTimer.stop();
     }
-  },3000);
+  });
+
 
   function checkFileType(filetype){
     for (var i=0; i<mime_types.length; i++){
@@ -368,14 +435,17 @@
   }
 
   // ファイル送信状況の表示
-  function changeUploadStatusView(filename,st_flg) {
+  function changeUploadStatusView(filename, st_flg, status) {
     var upload_status_view = document.getElementById('upload_status_view');
     view_str = "";
     if (st_flg=="uploading"){
-      view_str = '<font size="14"><b> 『' + filename + '』 を設定中！</b></font>';
+      view_str = ' 『' + filename + '』 を設定中！ (' + status +'%)';
     } else if (st_flg=='upload_complete'){
-      view_str = '<font size="14"><b> 『' + filename + '』 設定終了！</b></font>';
+      view_str = ' 『' + filename + '』 設定終了！ (100%)';
     }
+    upload_status_view.style.fontSize = '16';
+    upload_status_view.style.fontWeight = "bolder";
+    upload_status_view.style.margin = '10px';
     upload_status_view.innerHTML = view_str;
 
     if (st_flg=='denied'){

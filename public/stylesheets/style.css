@@ -7,14 +7,67 @@ a {
   color: #00B7FF;
 }
 
-#dropzone {background-color:gray}
-table {background-color:peachpuff;border:0}
+#dropzone {
+  align:center;
+  width:95%;
+  height:100px;
+  background-color:gray;
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+#dropzone_caption {
+  margin:10px
+}
+
+table {
+  background-color:peachpuff;
+  border:0;
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+tr {
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+th {
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+td {
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+
 .mydata {background-color:palegreen;color:red}
 .otherdata {background-color:paleturquoise}
-#mainarea {overflow:hidden;width:90%;height:500px;background-color:whitesmoke;margin:0 auto 0 auto}
-#media {float:left;margin:20px;videoWidth:600px}
+#mainarea {
+  overflow:hidden;
+  width:90%;
+  height:500px;
+  background-color:
+  whitesmoke;
+  margin:0 auto 0 auto;
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+#media {
+  float:left;
+  margin:20px;
+  width:600px;
+}
 #playlist {float:left;margin:20px}
 input[type="button"] {
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
+}
+input[type="text"] {
   border-radius:10px;
   -webkit-border-radius:10px;
   -moz-border-radius:10px;
