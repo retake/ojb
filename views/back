@@ -41,6 +41,9 @@
   // 変数宣言
   var uploading_flg = false;
   var upload_que = [];
+  var slice_uploading_flg = false;
+  var slice_que = [];
+  var slice_size = 102400;
   var sessid = null; 
   var playlist = [];
   var userlist = [];
@@ -303,26 +306,47 @@
     }
   }
 
-  // 3秒に1度、送信中のファイルが無ければupload用queの中身を送る
-  setInterval(function(){
-    if( upload_que.length !=0 && uploading_flg == false){
-      uploading_flg = true;
+  // 0.5秒に１度、slice処理を確認する
+  setInterval( function(){
+    if (slices.length !=0 && slice_uploading_flg==false){
+      slice_uploading_flg = true;
       var reader = new FileReader();
-      var file = upload_que[0].file;
-      var filename = upload_que[0].filename;
+      var seqno = slices[0].seqno;
+      var filename = slices[0].filename;
+      reader.onload = function(readed) {
+        var data = readed.target.result;
+        SendFile({data:data,seqno:seqno,filename:filename});
+        slices.shift();
+        slice_uploading_flg = false;
+        if (slices.length == 0 ){
+          upload_que.shift();
+          uploading_flg = false;
+        }
+      }
+      reader.readAsbinaryString(slices[0].data);
+    }
+  },500);
+ 
+  // 3秒に1度、送信中のファイルが無ければupload用queを送信単位に分割する
+  setInterval(function(){
+    if( upload_que.length != 0 && !uploading_flg && !slice_uploading_flg){
+      uploading_flg = true;
+
+      // 正しいファイルタイプである場合は処理を行う
       if ( checkFileType(file.type) ){
         changeUploadStatusView(filename,"uploading");
-        reader.onload = function(readed) {
-          SendFile({file:readed.target.result, name:filename, filetype:file.type});
-          upload_que.shift();
-        uploading_flg = false;
+        var file = upload_que[0].file;
+        var filename = upload_que[0].filename;
+        var filesize = file.size;
+        var slice_cnt = filesize/slice_size;
+        for ( var i=0; i<slice_cnt; i++) {
+          slices.push({seqno:i, data:file.slice(i*slice_size,(i+1)*slice_size,filename:filename});
         }
       } else {
         changeUploadStatusView(filename,"denied");
         upload_que.shift();
         uploading_flg = false;
       }
-      reader.readAsBinaryString(file);
     }
   },3000);
 
