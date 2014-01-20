@@ -8,8 +8,7 @@ a {
 }
 
 #dropzone {
-  margin:0 auto 0 auto;
-  width:95%;
+  width:1280px;
   height:100px;
   background-color:gray;
   border-radius:10px;
@@ -17,29 +16,30 @@ a {
   -moz-border-radius:10px;
 }
 #dropzone_caption {
+  margin:0 auto 0 auto;
   margin:10px
 }
+#name {
+  width:1280px;
+}
 
-#dataarea {
-  overflow:hidden;
+#playinfo-container {
+  display: -webkit-box;
+  width:1280px;
 }
 
 #playinginfo {
-  float:left
+  -webkit-box-flex:1;
 }
 
 #vdown {
-  font-color:red;
   width:20px;
   height:20px;
-  float:right
 }
 
 #vup {
-  font-color:red;
   width:20px;
   height:20px;
-  float:right
 }
 
 table {
@@ -68,19 +68,17 @@ td {
 .mydata {background-color:palegreen;color:red}
 .otherdata {background-color:paleturquoise}
 #mainarea {
-  margin:0 auto 0 auto;
-  overflow:hidden;
-  width:90%;
-  height:600px;
+  margin:auto 40px auto;
+  display: -webkit-box;
+  width:1200px;
+  height:630px;
   background-color:
   whitesmoke;
-  margin:0 auto 0 auto;
   border-radius:10px;
   -webkit-border-radius:10px;
   -moz-border-radius:10px;
 }
 #media {
-  float:left;
   margin:20px;
   width:60%;
   border: 5px solid maroon;
@@ -89,9 +87,21 @@ td {
   -moz-border-radius:10px;
 }
 #playlist {
-  float:left;
   margin:20px;
-  width:30%
+  width:30%;
+  display:-webkit-box;
+}
+.nofiletr {background-color:white;text-align:center}
+.no {text-align:center}
+.id {-webkit-box-flex:1}
+.file {-webkit-box-flex:1}
+.remove {text-align:center}
+#userlist {
+  width:200px;
+}
+#input_area {
+  display:-webkit-box;
+  width:1280px;
 }
 input[type="button"] {
   border-radius:10px;
@@ -103,9 +113,3 @@ input[type="text"] {
   -webkit-border-radius:10px;
   -moz-border-radius:10px;
 }
-.nofiletr {background-color:white;text-align:center}
-.no {width:20px;text-align:center}
-.id {width:180px}
-.file {width:180px}
-.remove {width:20px;text-align:center}
-
