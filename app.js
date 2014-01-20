@@ -176,48 +176,50 @@ io.sockets.on('connection', function(socket) {
     socket.emit(soc_msgs.retcurrenttime,currentTime);
   });
 
+
+
   // upload用名前空間
-  var upload_ns = new (function(){
+  var upns = new (function(){
     this.writestart = false;
     this.fs = null;
+    this.path = "";
 
+    this.start = function(path) {
+      this.writestart = true;
+      this.fs = require('fs');
+      this.path = path;
+      this.fs.writeFileSync(this.path,"",'binary');
+    }
+    this.write = function(data) {
+      this.fs.appendFileSync(this.path,data,'binary');
+    }
     this.reset = function() {
       this.writestart = false;
-      this.fs = null;
+      this.fs = undefined;
+      this.path = "";
       return this;
     }
     return this;
   });
+
+
   // ファイルが送られてきた時の処理
   socket.on(soc_msgs.uploadfile, function(data,fn){
-    if (!upload_ns.writestart) {
-      upload_ns.writestart = true;
+    if (!upns.writestart) {
       mediafiles.push({sessid:socket.id,filename:data.filename,status:"writing",filetype:data.filetype});
-      upload_ns.fs = require('fs');
-      var writePath = './public/mediadata/'+data.filename;
-      var writeStream = upload_ns.fs.createWriteStream(writePath);
-      writeStream.on('drain',function() {})
-        .on('error',function(exception) {
-          console.log('exception:'+exception);
-        })
-        .on('close',function(){
-          //console.log('書き込み完了');
-        })
-        .on('pipe',function(src){});
-      writeStream.write(data.data,'binary');
-      writeStream.end();
+      upns.start('./public/mediadata/'+data.filename);
+      upns.write(data.data);
     } else {
-      upload_ns.fs.appendFile('./public/mediadata/'+data.filename,data.data,'binary',function(){
-      });
+      upns.write(data.data);
     }
     if (data.end_flg){ 
-     for (var i in mediafiles){
+      for (var i in mediafiles){
         if (mediafiles[i].sessid == socket.id && mediafiles[i].filename==data.filename){
           mediafiles[i].status = "writed";
         }
       } 
       updatePlayList();
-      upload_ns.reset();
+      upns.reset();
       fn('success');
     } else {
       fn('uploading');
@@ -262,3 +264,28 @@ function removeFile(filename){
   fs.unlink('./public/mediadata/'+filename);
   console.log(filename+'を削除しました。');
 }
+
+var mytools = new (function(){
+  // タイマー作成
+  this.timer = function(interval, fn){
+    this.interval = interval;
+    this.fn = fn;
+    this.tm = null;
+    this.start = function() {
+      if (!this.tm) {
+        this.tm = setInterval(fn,this.interval);
+      }
+      return this;
+    };
+    this.stop = function() {
+      clearInterval(this.tm);
+      this.tm = null;
+      return this;
+    };
+    return this;
+  }
+  return this
+});
+
+
+

@@ -1,5 +1,6 @@
-  // タイマー作成
-function timer(interval, fn){
+var mytools = new (function(){
+// タイマー作成
+this.timer = function(interval, fn){
   this.interval = interval;
   this.fn = fn;
   this.tm = null;
@@ -16,6 +17,7 @@ function timer(interval, fn){
   };
   return this;
 }
-
+return this
+});
 
 

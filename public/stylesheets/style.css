@@ -8,7 +8,7 @@ a {
 }
 
 #dropzone {
-  align:center;
+  margin:0 auto 0 auto;
   width:95%;
   height:100px;
   background-color:gray;
@@ -18,6 +18,28 @@ a {
 }
 #dropzone_caption {
   margin:10px
+}
+
+#dataarea {
+  overflow:hidden;
+}
+
+#playinginfo {
+  float:left
+}
+
+#vdown {
+  font-color:red;
+  width:20px;
+  height:20px;
+  float:right
+}
+
+#vup {
+  font-color:red;
+  width:20px;
+  height:20px;
+  float:right
 }
 
 table {
@@ -46,9 +68,10 @@ td {
 .mydata {background-color:palegreen;color:red}
 .otherdata {background-color:paleturquoise}
 #mainarea {
+  margin:0 auto 0 auto;
   overflow:hidden;
   width:90%;
-  height:500px;
+  height:600px;
   background-color:
   whitesmoke;
   margin:0 auto 0 auto;
@@ -59,9 +82,17 @@ td {
 #media {
   float:left;
   margin:20px;
-  width:600px;
+  width:60%;
+  border: 5px solid maroon;
+  border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-border-radius:10px;
 }
-#playlist {float:left;margin:20px}
+#playlist {
+  float:left;
+  margin:20px;
+  width:30%
+}
 input[type="button"] {
   border-radius:10px;
   -webkit-border-radius:10px;
@@ -75,6 +106,6 @@ input[type="text"] {
 .nofiletr {background-color:white;text-align:center}
 .no {width:20px;text-align:center}
 .id {width:180px}
-.file {width:200px}
+.file {width:180px}
 .remove {width:20px;text-align:center}
 

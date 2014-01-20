@@ -16,7 +16,8 @@
     <br>
     <div id="name"></div>
     <br>
-    <div id="playinginfo"></div>
+    <div id='dataarea'></div>
+      <div id="playinginfo"></div><div id='vdown'>↓</div><div id='vup'>↑</div>
     <br>
     <div id='mainarea'>
       <div id="playlist"></div>
@@ -38,6 +39,7 @@
 
 // 即時関数内で実行
 (function(){
+
 
   // 変数宣言
   var uploading_flg = false;
@@ -62,11 +64,56 @@
   var video_mime_types = getVideoMimeTypes();
   var mime_types = audio_mime_types.concat(video_mime_types);
 
-  var media = undefined;
-
   // websocket接続開始
   var address = '<%=conf.host%>:<%=conf.port%>';
   var socket = io.connect(address);
+
+  // mediaの初期化
+  var media = document.getElementById("media");
+  media.style.display = "none";
+  media.preload = 'metadata';
+  media.addEventListener("ended", function(e){
+    media.style.display = "none";
+    if (playlist[0].sessid == sessid && playing_file_info=='player'){
+      sendCurrentTimeTimer.stop();
+      socket.emit('<%=conf.soc_msgs.playend%>', playlist[0]);
+    }
+  },false);
+  media.addEventListener("loadedmetadata", function(e){
+    if (playlist[0].sessid == sessid){
+      playing_file_info = 'player';
+      sendCurrentTimeTimer.start();
+      mediastart();
+    } else {
+      playing_file_info = 'listener';
+      socket.emit('<%=conf.soc_msgs.getcurrenttime%>',{});
+    }
+    console.log(playing_file_info);
+  }, false);
+
+
+  // mediaコントロール
+  var vdown = document.getElementById('vdown');
+  var vup = document.getElementById('vup');
+
+  vdown.addEventListener('click',function(e){
+    var currentVolume = media.volume;
+    targetVolume = currentVolume - 0.05;
+    if (targetVolume < 0){
+      targetVolume = 0;
+    }
+    media.volume = targetVolume;;
+  },false);
+
+  vup.addEventListener('click',function(e){
+    var currentVolume = media.volume;
+    targetVolume = currentVolume + 0.05;
+    if (targetVolume > 1){
+      targetVolume = 1;
+    }
+    media.volume = targetVolume;;
+  },false);
+
 
    // 接続開始完了時の処理
   socket.on('<%=conf.soc_msgs.conn%>', function(msg) {
@@ -74,29 +121,6 @@
     sessid = socket.socket.transport.sessid;
     document.getElementById("name").value = sessid;
  
-    // mediaの初期化
-    media = document.getElementById("media");
-    media.style.display = "none";
-    media.preload = 'metadata';
-    media.addEventListener("ended", function(e){
-      media.style.display = "none";
-      if (playlist[0].sessid == sessid && playing_file_info=='player'){
-        sendCurrentTimeTimer.stop();
-        socket.emit('<%=conf.soc_msgs.playend%>', playlist[0]);
-      }
-    },false);
-    media.addEventListener("loadedmetadata", function(e){
-      if (playlist[0].sessid == sessid){
-        playing_file_info = 'player';
-        sendCurrentTimeTimer.start();
-        mediastart();
-      } else {
-        playing_file_info = 'listener';
-        socket.emit('<%=conf.soc_msgs.getcurrenttime%>',{});
-      }
-      console.log(playing_file_info);
-    }, false);
-
     //buttonの初期化
     document.getElementById('disconnect_btn').style.display = "";
     document.getElementById('reconnect_btn').style.display = "none";
@@ -300,7 +324,7 @@
   }
 
   // 一秒置きに 再生中ファイルの時間を送信
-  sendCurrentTimeTimer = new timer(1000,function(){
+  sendCurrentTimeTimer = new mytools.timer(1000,function(){
     if (playlist.length != 0 && playlist[0].sessid == sessid && media != undefined){
       socket.emit('<%=conf.soc_msgs.sendcurrenttime%>', {value:media.currentTime});
     }
@@ -324,7 +348,7 @@
   }
 
   // 送信用sliceque確認タイマー作成
-  sliceUploadTimer = timer(400,function(){
+  sliceUploadTimer = mytools.timer(500,function(){
     if (slices.length !=0 && uploading_flg){
       var reader = new FileReader();
       var seqno = slices[0].seqno;
@@ -354,9 +378,10 @@
  
 
   // 送信中ファイルque確認タイマー作成
-  queTimer = new timer(3000,function(){
+  queTimer = new mytools.timer(3000,function(){
     if( upload_que.length != 0 && !uploading_flg && !slice_uploading_flg){
       uploading_flg = true;
+      queTimer.stop();
  
       var file = upload_que[0].file;
       var filename = upload_que[0].filename;
@@ -380,12 +405,12 @@
              slice_cnt:slice_cnt
           });
         }
-        queTimer.stop();
         sliceUploadTimer.start();
       } else {
         changeUploadStatusView(filename,"denied",0);
         upload_que.shift();
         uploading_flg = false;
+        queTimer.start();
       }
     } else if (upload_que.length == 0) {
       queTimer.stop();
