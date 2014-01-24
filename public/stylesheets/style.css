@@ -1,7 +1,7 @@
 body {
   padding: 50px;
+  color:black;
 }
-
 
 #dropzone {
   width:1280px;
@@ -29,16 +29,6 @@ body {
   -webkit-box-flex:1;
 }
 
-#vdown {
-  width:20px;
-  height:20px;
-}
-
-#vup {
-  width:20px;
-  height:20px;
-}
-
 table {
   background-color:peachpuff;
   border:0;
@@ -62,15 +52,19 @@ td {
   -moz-border-radius:10px;
 }
 
-.mydata {background-color:palegreen;color:red}
-.otherdata {background-color:paleturquoise}
+.mydata {
+  background-color:palegreen;
+  color:red
+}
+.otherdata {
+  background-color:paleturquoise
+}
 #mainarea {
   margin:auto 20px auto;
   display: -webkit-box;
   width:1240px;
-  height:630px;
-  background-color:
-  whitesmoke;
+  height:700px;
+  background-color:whitesmoke;
   border-radius:10px;
   -webkit-border-radius:10px;
   -moz-border-radius:10px;

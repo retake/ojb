@@ -8,7 +8,6 @@ var ojb = new (function(){
     this.uploading_flg = false;
     this.upload_que = [];
     this.slice_uploading_flg = false;
-    //this.slice_size = 1024000;
     this.slice_size = 409600;
     this.slices = [];
     this.sessid = null; 
@@ -18,6 +17,7 @@ var ojb = new (function(){
     this.audio_mime_types = confs.audio_mime_types;
     this.video_mime_types = confs.video_mime_types;
     this.mime_types = this.audio_mime_types.concat(this.video_mime_types);
+    this.fullscreen_mode = false;
     this.socket = null;
     this.address = this.confs.address;
 
@@ -27,6 +27,7 @@ var ojb = new (function(){
     this.media.preload = 'metadata';
     this.media.addEventListener("ended", function(e){
       ojb.media.style.display = "none";
+      ojb.reset_video();
       if (playlist[0].sessid == ojb.sessid && playing_file_info=='player'){
         ojb.sendCurrentTimeTimer.stop();
         ojb.socket.emit(ojb.confs.soc_msgs.playend, playlist[0]);
@@ -43,30 +44,23 @@ var ojb = new (function(){
       }
       console.log(playing_file_info);
     }, false);
-  
-    // mediaコントロール
-    this.vdown = document.getElementById('vdown');
-    this.vup = document.getElementById('vup');
-  
-    vdown.addEventListener('click',function(e){
-      var currentVolume = ojb.media.volume;
-      targetVolume = currentVolume - 0.05;
-      if (targetVolume < 0){
-        targetVolume = 0;
-      }
-      ojb.media.volume = targetVolume;;
-    },false);
-  
-    vup.addEventListener('click',function(e){
-      var currentVolume = ojb.media.volume;
-      targetVolume = currentVolume + 0.05;
-      if (targetVolume > 1){
-        targetVolume = 1;
-      }
-      ojb.media.volume = targetVolume;;
-    },false);
 
-     // documentのイベント作成
+    // mediaコントロール
+    this.media.addEventListener("dblclick", function(e){
+      ojb.fullscreen_mode = !ojb.fullscreen_mode;
+      ojb.resize_video();
+    }, false);  
+    document.getElementById("mainarea").addEventListener("mousewheel", function(e){
+      e.preventDefault();
+      if (e.wheelDelta > 0){
+        ojb.vup_func();
+      } else {
+        ojb.vdown_func();
+      }
+    }, false);
+
+
+    // documentのイベント作成
     this.body_elm  = document.getElementsByTagName('body')[0];
     this.body_elm.addEventListener("dragover",this.handleDragOver,false);
     this.body_elm.addEventListener("drop", this.handleFileSelect,false);
@@ -233,6 +227,7 @@ var ojb = new (function(){
   // メディア停止処理
   this.mediastop = function(){
     ojb.media.style.display = "none";
+    ojb.reset_video();
     ojb.media.pause();
   }
   
@@ -436,6 +431,63 @@ var ojb = new (function(){
     if (e.keycode==13) {
       changeName();
     }
+  }
+
+  this.vdown_func = (function(){
+    var currentVolume = ojb.media.volume;
+    targetVolume = currentVolume - 0.02;
+    if (targetVolume < 0){
+      targetVolume = 0;
+    }
+    ojb.media.volume = targetVolume;;
+  });
+
+  this.vup_func = (function(){
+    var currentVolume = ojb.media.volume;
+    targetVolume = currentVolume + 0.02;
+    if (targetVolume > 1){
+      targetVolume = 1;
+    }
+    ojb.media.volume = targetVolume;;
+  });
+
+
+  this.resize_video = (function(){
+    var playlist = document.getElementById("playlist");
+    if (!ojb.fullscreen_mode) {
+      ojb.media.style.position = 'static';
+      ojb.media.style.width = "800px";
+      ojb.media.style.height = "auto";
+      playlist.style.display = "";
+    } else {
+      ojb.media.style.position = 'fixed';
+      ojb.media.style.top = '0px';
+      var clientHeight = document.documentElement.clientHeight;
+      var clientWidth = document.documentElement.clientWidth;
+      var videoHeight = ojb.media.offsetHeight;
+      var videoWidth = ojb.media.offsetWidth;
+
+      if (clientWidth < videoWidth+60){
+        ojb.media.style.height = "auto";
+        ojb.media.style.width = clientWidth-60+'px';
+      } else {
+        ojb.media.style.height = clientHeight-60+'px';
+        ojb.media.style.width = "auto";
+      }
+      ojb.media.style.left = ((clientWidth-ojb.media.offsetWidth)/2)-30+'px';
+      playlist.style.display = "none";
+    }
+  });
+
+  this.reset_video = function(){
+    ojb.media.style.position = 'static';
+    ojb.media.style.width = "800px";
+    ojb.media.style.height = "auto";
+    document.getElementById('playlist').style.display = "";
+  }
+ 
+  window.onresize = function(){
+    ojb.resize_video();
   }
 
 
