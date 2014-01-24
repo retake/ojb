@@ -59,6 +59,8 @@ var ojb = new (function(){
       }
     }, false);
 
+    this.def_media_style = window.getComputedStyle(ojb.media,null);
+    this.def_media_margin = this.def_media_style.getPropertyValue('margin');
 
     // documentのイベント作成
     this.body_elm  = document.getElementsByTagName('body')[0];
@@ -451,30 +453,39 @@ var ojb = new (function(){
     ojb.media.volume = targetVolume;;
   });
 
-
   this.resize_video = (function(){
     var playlist = document.getElementById("playlist");
     if (!ojb.fullscreen_mode) {
       ojb.media.style.position = 'static';
       ojb.media.style.width = "800px";
       ojb.media.style.height = "auto";
+      ojb.media.style.margin = ojb.def_media_margin;
       playlist.style.display = "";
     } else {
+      var clientHeight = parseInt(document.documentElement.clientHeight,10);
+      var clientWidth = parseInt(document.documentElement.clientWidth,10);
+      var videoHeight = parseInt(ojb.media.offsetHeight,10);
+      var videoWidth = parseInt(ojb.media.offsetWidth,10);
+      var client_aspect = clientWidth/clientHeight;
+      var video_aspect = parseInt(ojb.media.videoWidth,10)/parseInt(ojb.media.videoHeight,10);
+      var margin = 10;
+      var scroll_size = parseInt(window.innerWidth,10)-clientWidth;
+      ojb.media.style.visibility = "hidden";
       ojb.media.style.position = 'fixed';
       ojb.media.style.top = '0px';
-      var clientHeight = document.documentElement.clientHeight;
-      var clientWidth = document.documentElement.clientWidth;
-      var videoHeight = ojb.media.offsetHeight;
-      var videoWidth = ojb.media.offsetWidth;
-
-      if (clientWidth < videoWidth+60){
+      ojb.media.style.margin = margin+'px';
+      var left_position = '';
+      if (video_aspect > client_aspect){
+        ojb.media.style.width = clientWidth-(margin*2)-scroll_size+'px';
         ojb.media.style.height = "auto";
-        ojb.media.style.width = clientWidth-60+'px';
+        left_position = '0px'
       } else {
-        ojb.media.style.height = clientHeight-60+'px';
+        ojb.media.style.height = clientHeight-margin*2+'px';
         ojb.media.style.width = "auto";
+        left_position = (clientWidth-(parseInt(ojb.media.offsetWidth,10)+margin*2))/2+'px';
       }
-      ojb.media.style.left = ((clientWidth-ojb.media.offsetWidth)/2)-30+'px';
+      ojb.media.style.left = left_position;
+      ojb.media.style.visibility = "visible";
       playlist.style.display = "none";
     }
   });
