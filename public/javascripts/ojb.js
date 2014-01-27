@@ -20,11 +20,13 @@ var ojb = new (function(){
     this.fullscreen_mode = false;
     this.socket = null;
     this.address = this.confs.address;
-
-     // mediaの初期化
-    this.media = document.getElementById("media");
+ 
+    // mediaの初期化
+    this.media = document.createElement('video');
     this.media.style.display = "none";
+    this.media.id = 'media';
     this.media.preload = 'metadata';
+    document.getElementById('mainarea').appendChild(this.media);
     this.media.addEventListener("ended", function(e){
       ojb.media.style.display = "none";
       ojb.reset_video();
@@ -242,6 +244,7 @@ var ojb = new (function(){
       ojb.mediastop();
     }
     ojb.socket.disconnect({sessid:ojb.sessid});
+    delete this.media;
     document.getElementById('disconnect_btn').style.display = "none";
     document.getElementById('reconnect_btn').style.display = "";
   }
@@ -254,17 +257,30 @@ var ojb = new (function(){
    ojb.socket.socket.connect(this.address);
   }
 
-     // ユーザーリストテーブル最新化
+
+  // パラメータを元にエレメントを作成 
+  var createElementWithParams = function(params){
+    var elm = document.createElement(params.node);
+    if (undefined != params.id){elm.id = params.id;}
+    if (undefined != params.className){elm.className = params.className;}
+    if (undefined != params.innerHTML){elm.innerHTML = params.innerHTML;}
+    if (undefined != params.type){elm.type = params.type;}
+    if (undefined != params.value){elm.value = params.value;}
+    if (undefined != params.disabled){elm.disabled = params.disabled;}
+    if (undefined != params.colspan){elm.colSpan = params.colspan;}
+    return elm;
+  }
+
+  // ユーザーリストテーブル最新化
   this.createUserListTable = function(){
     var userlist_elm = document.getElementById('userlist');
-    var userlist_str = "";
     if (userlist.length>0) {
-      userlist_str = '<table>';
-      userlist_str = userlist_str.concat('<caption>接続ユーザリスト<caption>');
-      userlist_str = userlist_str.concat('<tr>');
-      userlist_str = userlist_str.concat('<th class=\'no\'>no</th>');
-      userlist_str = userlist_str.concat('<th class=\'id\'>ID/name</th>');
-      userlist_str = userlist_str.concat('</tr>');
+      var table_elm = createElementWithParams({node:'table'});
+      table_elm.appendChild(createElementWithParams({node:'caption',innerHTML:'接続ユーザリスト'}));
+      var tr_th_elm = createElementWithParams({node:'tr'});
+      tr_th_elm.appendChild(createElementWithParams({node:'th',className:'no',innerHTML:'no'}));
+      tr_th_elm.appendChild(createElementWithParams({node:'th',className:'id',innerHTML:'ID'}));
+      table_elm.appendChild(tr_th_elm);
       for (var i=0; i<userlist.length; i++){
         var trclass = "";
         var username = userlist[i].dispname;
@@ -273,33 +289,35 @@ var ojb = new (function(){
         } else {
           trclass = "otherdata";
         }
-        userlist_str = userlist_str.concat('<tr class="'+trclass+'">');
-        userlist_str = userlist_str.concat('<td class=\'no\'>'+(i+1)+'</td>');
-        userlist_str = userlist_str.concat('<td class=\'id\'>'+username+'</td>');
-        userlist_str = userlist_str.concat('</tr>');
+        
+        var tr_elm = createElementWithParams({node:'tr',className:trclass});
+        tr_elm.appendChild(createElementWithParams({node:'td',className:'no',innerHTML:i+1}));
+        tr_elm.appendChild(createElementWithParams({node:'td',className:'id',innerHTML:username}));
+        table_elm.appendChild(tr_elm);
       } 
-      userlist_str = userlist_str.concat('</table>');
     }
-    userlist_elm.innerHTML = userlist_str;
+    for (var i=userlist_elm.childNodes.length-1; i>=0; i--){
+      userlist_elm.removeChild(userlist_elm.childNodes[i]);
+    }
+    userlist_elm.appendChild(table_elm);
   }
 
    // プレイリストテーブル最新化
   this.createPlayListTable = function(){
     var playlist_elm = document.getElementById("playlist");
-    var playlist_str = "";
     var filename = null;
     var color = null;
     var btn_sts = "";
     var playinfo_elm = document.getElementById('playinginfo');
-    playinfo_elm.innerHTML = "";
-    playlist_str = '<table>';
-    playlist_str = playlist_str.concat('<caption>プレイリスト</caption>');
-    playlist_str = playlist_str.concat('<tr>');
-    playlist_str = playlist_str.concat('<th class=\'no\'>no</th>');
-    playlist_str = playlist_str.concat('<th class=\'id\'>ID/name</th>');
-    playlist_str = playlist_str.concat('<th class=\'filename\'>filename</th>');
-    playlist_str = playlist_str.concat('<th class=\'remove\'>remove</th>');
-    playlist_str = playlist_str.concat('</tr>');
+
+    var table_elm = createElementWithParams({node:'table'});
+    table_elm.appendChild(createElementWithParams({node:'caption',innerHTML:'プレイリスト'}));
+    var tr_th_elm = createElementWithParams({node:'tr'});
+    tr_th_elm.appendChild(createElementWithParams({node:'th',className:'no',innerHTML:'no'}));
+    tr_th_elm.appendChild(createElementWithParams({node:'th',className:'id',innerHTML:'username'}));
+    tr_th_elm.appendChild(createElementWithParams({node:'th',className:'filename',innerHTML:'filename'}));
+    tr_th_elm.appendChild(createElementWithParams({node:'th',className:'remove',innerHTML:'remove'}));
+    table_elm.appendChild(tr_th_elm);
     if (playlist.length>0) {
       document.getElementById('playinfo-container').style.display = '';
       for (var i=0; i<playlist.length; i++){
@@ -307,29 +325,34 @@ var ojb = new (function(){
         filename = playlist[i].filename;
         if (ojb.sessid == playlist[i].sessid) {
           trclass = "mydata";
-          btn_sts = "";
+          btn_sts = false;
         } else {
           trclass = "otherdata";
-          btn_sts = "disabled";
+          btn_sts = true;
         }
         if (i==0){
           playinfo_elm.innerHTML = '再生中: <b>' + filename + '</b>';
         }
-        playlist_str = playlist_str.concat('<tr class='+trclass+'>');
-        playlist_str = playlist_str.concat('<td class=\'no\'>'+(i+1)+'</td>');
-        playlist_str = playlist_str.concat('<td class=\'id\'>'+ojb.getDispName(playlist[i].sessid)+'</td>');
-        playlist_str = playlist_str.concat('<td class=\'file\'>'+filename+'</td>');
-        playlist_str = playlist_str.concat('<td class=\'remove\'><input id="playno'+i+'" type=button value=\'削除\' '+btn_sts+'/></td>');
-        playlist_str = playlist_str.concat('</tr>');
+        var tr_elm = createElementWithParams({node:'tr',className:trclass});
+        tr_elm.appendChild(createElementWithParams({node:'td',className:'no',innerHTML:i+1}));
+        tr_elm.appendChild(createElementWithParams({node:'td',className:'id',innerHTML:ojb.getDispName(playlist[i].sessid)}));
+        tr_elm.appendChild(createElementWithParams({node:'td',className:'file',innerHTML:filename}));
+        var remove_elm = createElementWithParams({node:'td',className:'remove'});
+        remove_elm.appendChild(createElementWithParams({node:'input',id:'playno'+i,type:'button',value:'削除',disabled:btn_sts}));
+        tr_elm.appendChild(remove_elm);
+        table_elm.appendChild(tr_elm);
       } 
     } else {
-      playlist_str = playlist_str.concat('<tr class="nofiletr">');
-      playlist_str = playlist_str.concat('<td colspan="4">nofile</th>');
-      playlist_str = playlist_str.concat('</tr>');
+      var tr_elm = createElementWithParams({node:'tr',className:'nofiletr'});
+      tr_elm.appendChild(createElementWithParams({node:'td',colspan:'4',innerHTML:"nofile"}));;
+      table_elm.appendChild(tr_elm);
       document.getElementById('playinfo-container').style.display = 'none';
     }
-    playlist_str = playlist_str.concat('</table>');
-    playlist_elm.innerHTML = playlist_str;
+
+    for (var i=playlist_elm.childNodes.length-1; i>=0; i--){
+      playlist_elm.removeChild(playlist_elm.childNodes[i]);
+    }
+    playlist_elm.appendChild(table_elm);
 
     for (var i=0; i<playlist.length; i++){
       var remove_elm = document.getElementById('playno'+i);
@@ -500,7 +523,6 @@ var ojb = new (function(){
   window.onresize = function(){
     ojb.resize_video();
   }
-
 
 })();
 
