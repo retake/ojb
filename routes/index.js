@@ -4,6 +4,6 @@
  */
 
 exports.index = function(req, res){
-  conf = require('config');
+  var conf = require('config');
   res.render('index', { title: 'jukebox' ,conf: conf});
 };
