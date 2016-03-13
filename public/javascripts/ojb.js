@@ -4,6 +4,7 @@ var ojb = new (function(){
 
   //初期化
   this.init = function(confs){
+    
     this.confs = confs;
     this.uploading_flg = false;
     this.upload_que = [];
@@ -159,8 +160,7 @@ var ojb = new (function(){
   
      // 接続開始完了時の処理
     this.socket.on(ojb.confs.soc_msgs.conn, function(msg) {
-      console.log(ojb.confs.soc_msgs.conn);
-      ojb.sessid = ojb.socket.socket.transport.sessid;
+      ojb.sessid = ojb.socket.sessid;
       document.getElementById("name").value = ojb.sessid;
    
       //buttonの初期化
@@ -170,14 +170,13 @@ var ojb = new (function(){
   
    // 再生停止通知受信時の処理
     ojb.socket.on(ojb.confs.soc_msgs.playstop, function(data) {
-      console.log(ojb.confs.soc_msgs.playstop);
       ojb.mediastop();
     });
   
     // 再生開始時の処理
     this.socket.on(ojb.confs.soc_msgs.playstart, function(startTime) {
-      console.log(ojb.confs.soc_msgs.playstart);
       ojb.media.src = './mediadata/'+playlist[0].filename;
+      ojb.media.currentTime = startTime;
       ojb.mediastart();
     });
   
@@ -198,6 +197,7 @@ var ojb = new (function(){
   
     // ユーザーリスト受信時の処理
     this.socket.on(ojb.confs.soc_msgs.updateuserlist,function(newuserlist){
+      console.log("updateuserlist");
       userlist = newuserlist;
       var yourname = ojb.getDispName(ojb.sessid);
       document.getElementById('name').innerHTML = 'よくぞまいった <font color=\'red\'><b>'+yourname+'</b></font> よ！';
@@ -255,7 +255,7 @@ var ojb = new (function(){
    document.getElementById('reconnect_btn').style.display = "none";
    // 再接続は、１度作ったsocketから行う。何故かは不明。
    ojb.socket.socket.connect(this.address);
-  }
+  };
 
 
   // パラメータを元にエレメントを作成 

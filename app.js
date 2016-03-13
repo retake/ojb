@@ -1,270 +1,195 @@
+var Commons = require('./private/commons.js');
+var Media = require('./private/medias.js');
 
-/**
- * Module dependencies.
- */
+var server_params = init();
+start_web_socket();
 
-var express = require('express');
-var routes = require('./routes');
-var user = require('./routes/user');
-var http = require('http');
-var path = require('path');
+function init(common_params) {
+  this.express = require('express');
+  this.routes = require('./routes');
+  this.user = require('./routes/user');
+  this.http = require('http');
+  this.path = require('path');
+  this.app = this.express();
 
-var conf = require('config');
+  // all environments
+  this.app.set('port', process.env.PORT || common_params.conf.port);
+  this.app.set('ip', process.env.IP || common_params.conf.host);
+  this.app.set('views', this.path.join(__dirname, 'views'));
+  this.app.set('view engine', 'ejs');
+  this.app.use(this.express.favicon());
+  this.app.use(this.express.logger('dev'));
+  this.app.use(this.express.json());
+  this.app.use(this.express.urlencoded());
+  this.app.use(this.express.methodOverride());
+  this.app.use(this.app.router);
+  this.app.use(this.express.static(this.path.join(__dirname, 'public')));
 
-var app = express();
+  // development only
+  if ('development' == this.app.get('env')) {
+    this.app.use(this.express.errorHandler());
+  }
+  this.app.get('/', this.routes.index);
+  this.app.get('/users', this.user.list);
+  this.server = this.http.createServer(this.app);
+  this.server.listen(this.app.get('port'), this.app.get('ip'), function(arg_app){
+    console.log("Express server listening on port " + arg_app.get('ip') + ':' + arg_app.get('port'));
+  }(this.app));
+  this.socketIO = require('socket.io');
+  this.io = this.socketIO.listen(this.server);
 
-
-// all environments
-app.set('port', process.env.PORT || conf.port);
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'ejs');
-app.use(express.favicon());
-app.use(express.logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded());
-app.use(express.methodOverride());
-app.use(app.router);
-app.use(express.static(path.join(__dirname, 'public')));
-
-// development only
-if ('development' == app.get('env')) {
-  app.use(express.errorHandler());
+  return this;
 }
 
-app.get('/', routes.index);
-app.get('/users', user.list);
-
-server = http.createServer(app);
-server.listen(app.get('port'), function(){
-  console.log("Express server listening on port " + app.get('port'));
-});
-
-var socketIO = require('socket.io');
-var io = socketIO.listen(server);
-
-var mediafiles = [];
-var playlist = [];
-var mediaStatus = 'stop';
-var currentTime = 0;
-
-var userlist = [];
-
-var soc_msgs = conf.soc_msgs;
-
-
-// websocket関連処理
-io.sockets.on('connection', function(socket) {
-
-  var sessid = socket.id;
-
-  console.log("connection");
-  userlist.push({sessid:sessid, dispname:sessid});
-  updateUserList();
-  updatePlayList();
-
-  // 再生中のファイルがあれば、接続してきたクライアントに開始時刻を送る
-  if (mediaStatus=='playing'){
-    updatePlayList();
-    io.sockets.socket(sessid).emit(soc_msgs.playstart,currentTime);
-  }
-
-  // ユーザー名更新受信時の処理
-  socket.on(soc_msgs.changename,function(newname){
-    console.log(soc_msgs.changename);
-    for (var i=0; i<userlist.length; i++){
-      if (userlist[i].sessid == sessid){
-        userlist[i].dispname = newname;
-        break;
-      }
-    }
-    updateUserList();
-  });
-
-  // 最新のプレイリストを送信
-  function updatePlayList(){
-    playlist = [];
-    for (var i in mediafiles){
-      var file = mediafiles[i];
-      if (file.status!="writing"){
-        playlist.push(file);
-      }
-    }
-    io.sockets.emit(soc_msgs.updateplaylist,playlist);
-  }
-
-  // 最新のユーザーリストを送信
-  function updateUserList(){
-    io.sockets.emit(soc_msgs.updateuserlist,userlist);
-  }
-
-  // クライアントが切断したときの処理
-  socket.on('disconnect', function(data) {
-    console.log("disconnect");
-    var playing_user_flg = false;
-    if (mediafiles.length != 0 && playlist[0].sessid==socket.id){
-      playing_user_flg = true;
-      mediaStatus = 'lock';
-      io.sockets.emit(soc_msgs.playstop,{});
-      currentTime = 0;
-    }
-    for (var i=mediafiles.length-1; i>=0; i--) {
-      if(mediafiles[i].sessid==socket.id) {
-        removeFile(mediafiles[i].filename);
-        mediafiles.splice(i,1);
-        continue;
-      };
-    }
-    for (var i=0; i<userlist.length; i++) {
-      console.log(userlist);
-      if(userlist[i].sessid==socket.id){
-        console.log(userlist[i].sessid);
-        userlist.splice(i,1);
-        break;
-      }
-    }
-    updateUserList();
-    updatePlayList();
-    
-    // 5秒待ってからstatusをstopにする
-    if (playing_user_flg) {
-      changeStatusToStop();
-    };
-  });
-
-  // 再生終了通知を受信
-  socket.on(soc_msgs.playend, function(data){
-    console.log(soc_msgs.playend);
-    mediaStatus='lock';
-    removeFile(mediafiles[0].filename);
-    mediafiles.splice(0,1);
-    updatePlayList();
-    currentTime = 0;
-
-    // 5秒待ってからstatusをstopにする
-    changeStatusToStop();
-  });
-
-  // 指定したファイルを削除
-  socket.on(soc_msgs.removefile, function(data){
-    console.log(soc_msgs.removefile);
-    var targetno = null;
-    for (var i=0; i<mediafiles.length; i++){
-      if (mediafiles[i].sessid == socket.id && mediafiles[i].filename == data.filename) {
-        targetno = i
-        break;
-      }
-    }
-    if (targetno == 0) {
-      mediaStatus = 'lock';
-      io.sockets.emit(soc_msgs.playstop,{});
-      currentTime = 0;
-    }
-
-    removeFile(mediafiles[targetno].filename);
-    mediafiles.splice(targetno,1);
-    updatePlayList();
-
-    // 5秒待ってからstatusをstopにする
-    if (targetno == 0){
-      changeStatusToStop();
-    }
-  })
+function start_web_socket() {
+  var common = new Commons.init();
+  var media = new Media.init(common);
   
-  // currenttimeリクエスト受信時
-  socket.on(soc_msgs.getcurrenttime, function(data){
-    console.log(soc_msgs.getcurrenttime);
-    socket.emit(soc_msgs.retcurrenttime,currentTime);
-  });
-
-
-
-  // upload用名前空間
-  var upns = new (function(){
-    this.writestart = false;
-    this.fs = null;
-    this.path = "";
-
-    this.start = function(path) {
-      this.writestart = true;
-      this.fs = require('fs');
-      this.path = path;
-      this.fs.writeFileSync(this.path,"",'binary');
-    }
-    this.write = function(data) {
-      this.fs.appendFileSync(this.path,data,'binary');
-    }
-    this.reset = function() {
-      this.writestart = false;
-      this.fs = undefined;
-      this.path = "";
-      return this;
-    }
-    return this;
-  });
-
-
-  // ファイルが送られてきた時の処理
-  socket.on(soc_msgs.uploadfile, function(data,fn){
-    if (!upns.writestart) {
-      mediafiles.push({sessid:socket.id,filename:data.filename,status:"writing",filetype:data.filetype});
-      upns.start('./public/mediadata/'+data.filename);
-      upns.write(data.data);
-    } else {
-      upns.write(data.data);
-    }
-    if (data.end_flg){ 
-      for (var i in mediafiles){
-        if (mediafiles[i].sessid == socket.id && mediafiles[i].filename==data.filename){
-          mediafiles[i].status = "writed";
-        }
-      } 
-      updatePlayList();
-      upns.reset();
-      fn('success');
-    } else {
-      fn('uploading');
-    }          
-  });
-
-  // 再生中ファイルが無い場合、最初のファイルの再生を始める
+  // 5秒感覚で再生状態を確認し、未再生であれば再生（setIntervalのスコープ問題でコントローラに入れられないためここに設置）
   setInterval(function(){
-    if (mediaStatus=='stop' && mediafiles.length!=0){
-      if (mediafiles[0].status != "writing"){
-        mediaStatus = 'lock';
-        currentTime = 0;
-        updatePlayList();
-        io.sockets.emit(soc_msgs.playstart,0);
-        mediaStatus='playing';
+    if (media.media_status=='stop' && media.mediafiles.length!=0){
+      if (media.mediafiles[0].status != "writing"){
+        media.media_status = 'lock';
+        media.current_time = 0;
+        common.updatePlayList(server_params,media);
+        server_params.io.sockets.emit(common.soc_msgs.playstart,0);
+        media.media_status='playing';
       }
     }
   },5000);
 
- // 再生ファイルのcurrentTime受信
-  socket.on(soc_msgs.sendcurrenttime, function(data){
-    currentTime = data.value;
+  
+  server_params.io.sockets.on('connection', function(client_socket) {
+    
+    var user_session_id = client_socket.id;
+    proc_for_start_session();
+
+    // クライアントが切断時
+    client_socket.on('disconnect', function(data) {
+      console.log("disconnect");
+      var playing_user_flg = false;
+      if (media.mediafiles.length != 0 && media.playlist[0].sessid==client_socket.id){
+        playing_user_flg = true;
+        media.media_status = 'lock';
+        server_params.io.sockets.emit(common.soc_msgs.playstop,{});
+        media.current_time = 0;
+      }
+      for (var i=media.mediafiles.length-1; i>=0; i--) {
+        if(media.mediafiles[i].sessid==client_socket.id) {
+          media.removeFile(media.mediafiles[i].filename);
+          media.mediafiles.splice(i,1);
+          continue;
+        };
+      }
+      for (var i=0; i<media.userlist.length; i++) {
+        console.log(media.userlist);
+        if(media.userlist[i].sessid==client_socket.id){
+          console.log(media.userlist[i].sessid);
+          media.userlist.splice(i,1);
+          break;
+        }
+      }
+      common.updateUserList(server_params,media);
+      common.updatePlayList(server_params,media);
+      
+      // 5秒待ってからstatusをstopにする
+      if (playing_user_flg) {
+        media.changeMedia_statusToStop();
+      }
+    });
+    // ユーザー名更新受信時
+    client_socket.on(common.soc_msgs.changename,function(newname){
+      console.log(common.soc_msgs.changename);
+      for (var i=0; i<media.userlist.length; i++){
+        if (media.userlist[i].sessid == user_session_id){
+          media.userlist[i].dispname = newname;
+          break;
+        }
+      }
+      common.updateUserList(server_params,media);
+    });
+    // 再生終了通知を受信時
+    client_socket.on(common.soc_msgs.playend, function(data){
+      console.log(common.soc_msgs.playend);
+      media.media_status='lock';
+      media.removeFile(media.mediafiles[0].filename);
+      media.mediafiles.splice(0,1);
+      common.updatePlayList(server_params,media);
+      media.current_time = 0;
+  
+      // 5秒待ってからstatusをstopにする
+      media.changeMedia_statusToStop();
+    });
+    // 再生ファイルのcurrent_time受信
+    client_socket.on(common.soc_msgs.sendcurrent_time, function(data){
+      media.current_time = data.value;
+    });
+    // 再生ファイルのcurrent_timeリクエスト受信時
+    client_socket.on(common.soc_msgs.getcurrent_time, function(data){
+      console.log(common.soc_msgs.getcurrent_time);
+      client_socket.emit(common.soc_msgs.retcurrent_time,media.current_time);
+    });
+    // ファイル送信処理受信時
+    client_socket.on(common.soc_msgs.uploadfile, function(data,fn){
+      if (!media.upload_file_status.writestart) {
+        media.mediafiles.push({sessid:client_socket.id,filename:data.filename,status:"writing",filetype:data.filetype});
+        media.upload_file_status.start('./public/mediadata/'+data.filename);
+        media.upload_file_status.write(data.data);
+      } else {
+        media.upload_file_status.write(data.data);
+      }
+      if (data.end_flg){ 
+        for (var i in media.mediafiles){
+          if (media.mediafiles[i].sessid == client_socket.id && media.mediafiles[i].filename==data.filename){
+            media.mediafiles[i].status = "writed";
+          }
+        } 
+        common.updatePlayList(server_params,media);
+        media.upload_file_status.reset();
+        fn('success');
+      } else {
+        fn('uploading');
+      }          
+    });
+    // ファイル削除処理受信時
+    client_socket.on(common.soc_msgs.removefile, function(data){
+      console.log(common.soc_msgs.removefile);
+      var targetno = null;
+      for (var i=0; i<media.mediafiles.length; i++){
+        if (media.mediafiles[i].sessid == client_socket.id && media.mediafiles[i].filename == data.filename) {
+          targetno = i;
+          break;
+        }
+      }
+      if (targetno == 0) {
+        media.media_status = 'lock';
+        server_params.io.sockets.emit(common.soc_msgs.playstop,{});
+        media.current_time = 0;
+      }
+  
+      media.removeFile(media.mediafiles[targetno].filename);
+      media.mediafiles.splice(targetno,1);
+      common.updatePlayList(server_params,media);
+  
+      // 5秒待ってからstatusをstopにする
+      if (targetno == 0){
+        media.changeMedia_statusToStop();
+      }
+    });
+
+
+    function proc_for_start_session(){
+      console.log("connection");
+      media.userlist.push({sessid:server_params.user_session_id, dispname:server_params.user_session_id});
+      common.updateUserList(server_params,media);
+      common.updatePlayList(server_params,media);
+      media.send_current_time_of_playing_media(client_socket);
+    }
   });
-
-});
-
-// 5秒待ってからstatusをstopにする
-function changeStatusToStop() {
-  sleep(5000,function(){
-    mediaStatus='stop';
-  });
 }
 
-// sleep関数
-function sleep(time,callback){
-  setTimeout(callback,time);
-}
 
-// ファイル削除
-function removeFile(filename){
-  var fs = require('fs');
-  fs.unlink('./public/mediadata/'+filename);
-  console.log(filename+'を削除しました。');
-}
-
+/*
 var mytools = new (function(){
   // タイマー作成
   this.timer = function(interval, fn){
@@ -286,6 +211,4 @@ var mytools = new (function(){
   }
   return this
 });
-
-
-
+*/
